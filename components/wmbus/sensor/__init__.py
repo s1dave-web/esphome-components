@@ -64,8 +64,9 @@ validate_mode = cv.enum(FRAME_MODE, upper=True)
 def my_key(value):
     value = cv.string_strict(value)
     parts = [value[i : i + 2] for i in range(0, len(value), 2)]
-    if (len(parts) != 16) and (len(parts) != 0):
-        raise cv.Invalid("Key must consist of 16 hexadecimal numbers")
+    # 16 bytes (AES) for most meters; 8 bytes is also accepted for Diehl IZAR/PRIOS LFSR keys
+    if len(parts) not in (0, 8, 16):
+        raise cv.Invalid("Key must consist of 16 hexadecimal numbers (8 for an IZAR key)")
     parts_int = []
     if any(len(part) != 2 for part in parts):
         raise cv.Invalid("Key must be format XX")
@@ -337,6 +338,21 @@ CONFIG_SCHEMA = cv.Schema(
             device_class=DEVICE_CLASS_VOLTAGE,
             state_class=STATE_CLASS_MEASUREMENT,
             icon="mdi:sine-wave",
+        ),
+        cv.Optional("serial_number"): sensor.sensor_schema(
+            accuracy_decimals=0,
+            icon="mdi:numeric",
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional("manufacture_year"): sensor.sensor_schema(
+            accuracy_decimals=0,
+            icon="mdi:calendar-star",
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
+        ),
+        cv.Optional("last_month_measure_date"): sensor.sensor_schema(
+            accuracy_decimals=0,
+            icon="mdi:calendar",
+            entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
         ),
         cv.Optional("transmit_period_s"): sensor.sensor_schema(
             accuracy_decimals=0,

@@ -95,7 +95,8 @@ namespace wmbus {
                   frameMode,
                   frameFormat,
                   telegram.c_str());
-          if (sensor->key.size()) {
+          selected_driver->set_meter_key(sensor->key);
+          if (sensor->key.size() && !selected_driver->decrypts_itself()) {
             ESP_LOGVV(TAG, "Key defined, trying to decrypt telegram ...");
             if (this->decrypt_telegram(frame, sensor->key)) {
               std::string decrypted_telegram = format_hex_pretty(frame);

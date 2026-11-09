@@ -20,7 +20,14 @@ struct Driver
     std::string get_name() { return this->driver_type_; };
     std::string get_key() { return this->key_; };
 
+    // A driver with its own (non-AES) encryption, e.g. Diehl IZAR's LFSR, returns true here: the
+    // configured meter key is then handed to it via set_meter_key() instead of being used for AES.
+    virtual bool decrypts_itself() { return false; };
+    void set_meter_key(const std::vector<unsigned char> &key) { this->meter_key_ = key; };
+
   protected:
+    std::vector<unsigned char> meter_key_{};
+
     Driver(std::string driver_type, std::string key = "") :
           driver_type_(driver_type),
           key_(key) {

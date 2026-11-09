@@ -17,5 +17,15 @@ Changes from upstream `version_3`:
   15-byte header (alarm/battery bytes 11..13), refuse payloads that would overrun the 64-byte decode
   buffer, and only publish last-month values when the decoded payload contains them.
 
+- IZAR additions, ported from wmbusmeters (as used by v5) and checked against its six IZAR test telegrams:
+  - **Custom key:** `key:` is now used by the IZAR driver itself (Diehl LFSR, not AES). 8- or 16-byte
+    keys are accepted; the LFSR seed is the first 4 bytes XOR the next 4, as wmbusmeters does.
+  - **Second default key:** with no key, both Diehl default keys are tried (previously only the first),
+    so PRIOS meters that use the second one now decode.
+  - **New sensors:** `last_month_measure_date` (number, YYYYMMDD), and for SAP PRIOS frames
+    `serial_number` and `manufacture_year`.
+  - Drivers can now opt out of the generic AES decrypt (`Driver::decrypts_itself()`), which is what lets
+    a key reach the IZAR driver.
+
 No configuration changes: existing `version_3` YAML works as is. Remove `toolchain: platformio` and
 `platformio_options: lib_ignore: WiFi` from your config if you added them.

@@ -14,6 +14,9 @@
 struct Izar: Driver
 {
   Izar(std::string key = "") : Driver(std::string("izar"), key) {};
+
+  // IZAR uses Diehl's LFSR scrambling, not AES: the meter key (if any) is used here (see decrypt()).
+  bool decrypts_itself() override { return true; };
   virtual esphome::optional<std::map<std::string, double>> get_values(std::vector<unsigned char> &telegram) override {
     std::map<std::string, double> ret_val{};
 
@@ -34,6 +37,20 @@ struct Izar: Driver
       }
     }
 
+    // Date of the last-month reading, as a number YYYYMMDD (bytes 9..10 of the decoded payload)
+    if (decoded_size > 10) {
+      add_to_map(ret_val, "last_month_measure_date", this->get_last_month_measure_date(decrypted));
+    }
+
+    // Serial number and manufacture year are coded in the address of SAP "PRIOS" frames only
+    if (this->is_sap_prios(telegram)) {
+      const uint32_t digits = ((uint32_t)(telegram[7] & 0x03) << 24) | ((uint32_t)telegram[6] << 16) |
+                              ((uint32_t)telegram[5] << 8) | telegram[4];
+      const uint32_t yy = (digits / 1000000) % 100;      // printed as 8 digits: YY + 6-digit serial
+      add_to_map(ret_val, "serial_number", (double)(digits % 1000000));
+      add_to_map(ret_val, "manufacture_year", (double)(yy > 70 ? 1900 + yy : 2000 + yy));
+    }
+
     add_to_map(ret_val, "transmit_period_s", this->get_transmit_period_s(telegram));
     add_to_map(ret_val, "remaining_battery_life_y", this->get_remaining_battery_life_y(telegram));
     add_to_map(ret_val, "current_alarms", this->get_current_alarms(telegram));
@@ -48,6 +65,26 @@ struct Izar: Driver
   };
 
 private:
+  // Same rule as wmbusmeters' detectDiehlFrameInterpretation() for SAP_PRIOS
+  bool is_sap_prios(const std::vector<unsigned char> &telegram) {
+    const uint8_t c_field = telegram[1];
+    const uint16_t m_field = (telegram[3] << 8) | telegram[2];
+    const uint8_t ci_field = telegram[10];
+    return (c_field == 0x44 || c_field == 0x46) && m_field == 0x4C30 /* SAP */ &&
+           ci_field >= 0xA0 && ci_field <= 0xA7;
+  }
+
+  esphome::optional<double> get_last_month_measure_date(uint8_t *decrypted) {
+    uint16_t year = ((decrypted[10] & 0xF0) >> 1) + ((decrypted[9] & 0xE0) >> 5);
+    year += (year > 80) ? 1900 : 2000;
+    const uint8_t month = decrypted[10] & 0x0F;
+    const uint8_t day = decrypted[9] & 0x1F;
+    if (month < 1 || month > 12 || day < 1 || day > 31) {
+      return {};
+    }
+    return (double)(year * 10000UL + month * 100UL + day);
+  }
+
   esphome::optional<double> get_current_alarms(std::vector<unsigned char> &telegram) {
     esphome::optional<double> ret_val{};
     uint16_t alarms = 0;
@@ -143,13 +180,32 @@ private:
 
   static bool telegram_too_long(size_t len) { return (len - 15) > 64; }
 
+  // A configured key (8 or 16 bytes) becomes the LFSR seed as wmbusmeters' convertKey() does: first
+  // 4 bytes XOR next 4. With no key, both Diehl default keys are tried (PRIOS_DEFAULT_KEY1 / KEY2).
   uint8_t decrypt(uint8_t* encoded, size_t len, uint8_t* decoded) {
     // Header is 15 bytes; the decoded payload must also fit the caller's 64-byte buffer
     if (len < 15 || telegram_too_long(len)) {
       return 0;
     }
+    uint32_t seeds[2];
+    uint8_t n_seeds = 0;
+    if (this->meter_key_.size() >= 8) {
+      seeds[n_seeds++] = uintFromBytes(this->meter_key_.data()) ^ uintFromBytes(this->meter_key_.data() + 4);
+    } else {
+      seeds[n_seeds++] = 0xdfd109e8;  // 39BC8A10 ^ E66D83F8
+      seeds[n_seeds++] = 0xb71f0ae8;  // 51728910 ^ E66D83F8
+    }
+    for (uint8_t k = 0; k < n_seeds; k++) {
+      const uint8_t size = this->decrypt_with_seed(encoded, len, decoded, seeds[k]);
+      if (size > 0) {
+        return size;
+      }
+    }
+    return 0;
+  }
 
-    uint32_t key = 0xdfd109e8;
+  uint8_t decrypt_with_seed(uint8_t* encoded, size_t len, uint8_t* decoded, uint32_t seed) {
+    uint32_t key = seed;
     key ^= uintFromBytes(encoded + 2);
     key ^= uintFromBytes(encoded + 6);
     key ^= uintFromBytes(encoded + 10);
