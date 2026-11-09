@@ -1,4 +1,20 @@
-# Version 3
+# Version 3 — native toolchain build (`version_3_native`)
+
+> **This branch** keeps Szczepan's ESP8266-compatible `version_3` wmbus component building on current
+> ESPHome. ESPHome 2026.10 made a native ESP8266 toolchain the default and removes
+> `toolchain: platformio` in 2027.4; upstream v3 can't build there because it fetches `wmbus-drivers` as a
+> PlatformIO library. This branch bundles that library (and the CC1101 radio library) inside the
+> component instead. See [`components/wmbus/BUNDLED.md`](components/wmbus/BUNDLED.md) for exactly what
+> changed. v4 and v5 (upstream `main`) don't support the ESP8266.
+>
+> ```yaml
+> external_components:
+>   - source: github://s1dave-web/esphome-components@version_3_native
+>     components: [wmbus]
+> ```
+> Remove `toolchain: platformio` and `platformio_options: lib_ignore: WiFi` if you added them. Tested on a
+> Wemos D1 mini + CC1101 with a Diehl IZAR meter, ESPHome 2026.10.
+
 # Szczepan's esphome custom components
 
 This repository contains a collection of my custom components

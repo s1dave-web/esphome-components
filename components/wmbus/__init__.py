@@ -118,14 +118,6 @@ async def to_code(config):
 
     cg.add_library("SPI", None)
 
-    cg.add_library(
-        "SmartRC-CC1101-Driver",
-        None,
-        "https://github.com/LSatan/SmartRC-CC1101-Driver-Lib.git#v3.0.2",
-    )
-
-    cg.add_library(
-        "wM-Bus-drivers",
-        None,
-        "https://github.com/SzczepanLeon/wmbus-drivers#1.3.13",
-    )
+    # SmartRC-CC1101-Driver-Lib v3.0.2 (MIT) and wmbus-drivers 1.3.13 are bundled in this folder, so the
+    # build no longer fetches PlatformIO libraries. That is what lets this compile with ESPHome's native
+    # ESP8266 toolchain (2026.10+), which can't use wmbus-drivers as a library (it has no library.json).
