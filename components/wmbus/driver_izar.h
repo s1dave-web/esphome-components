@@ -17,12 +17,21 @@ struct Izar: Driver
   virtual esphome::optional<std::map<std::string, double>> get_values(std::vector<unsigned char> &telegram) override {
     std::map<std::string, double> ret_val{};
 
+    // Alarms, battery and transmit period are read from header bytes 11..13; ignore anything shorter
+    if (telegram.size() < 15) {
+      return {};
+    }
+
     uint8_t decrypted[64] = {0};
 
-    if ((this->decrypt(reinterpret_cast<uint8_t*>(telegram.data()), telegram.size(), decrypted)) > 0) {
+    const uint8_t decoded_size = this->decrypt(reinterpret_cast<uint8_t*>(telegram.data()), telegram.size(), decrypted);
+    if (decoded_size >= 5) {
       add_to_map(ret_val, "total_water_m3", this->get_total_water_m3(decrypted));
-      add_to_map(ret_val, "last_month_total_water_m3", this->get_last_month_total_water_m3(decrypted));
-      add_to_map(ret_val, "current_month_total_water_l", this->get_current_month_total_water_l(decrypted));
+      // Last month is bytes 5..8: only there in a long enough payload (as wmbusmeters checks)
+      if (decoded_size > 8) {
+        add_to_map(ret_val, "last_month_total_water_m3", this->get_last_month_total_water_m3(decrypted));
+        add_to_map(ret_val, "current_month_total_water_l", this->get_current_month_total_water_l(decrypted));
+      }
     }
 
     add_to_map(ret_val, "transmit_period_s", this->get_transmit_period_s(telegram));
@@ -132,8 +141,11 @@ private:
     return key;
   }
 
-  uint8_t decrypt(uint8_t* encoded, uint8_t len, uint8_t* decoded) {
-    if (len < 15) {
+  static bool telegram_too_long(size_t len) { return (len - 15) > 64; }
+
+  uint8_t decrypt(uint8_t* encoded, size_t len, uint8_t* decoded) {
+    // Header is 15 bytes; the decoded payload must also fit the caller's 64-byte buffer
+    if (len < 15 || telegram_too_long(len)) {
       return 0;
     }
 

@@ -13,5 +13,9 @@ Changes from upstream `version_3`:
 - `__init__.py`: the two `cg.add_library(...)` calls for these libraries are removed.
 - `rf_cc1101.h`, `cc1101_rf_settings.h`: `#include <ELECHOUSE_CC1101_SRC_DRV.h>` → `#include "ELECHOUSE_CC1101_SRC_DRV.h"`.
 
+- `driver_izar.h`: bounds checks brought in line with wmbusmeters/v5: ignore telegrams shorter than the
+  15-byte header (alarm/battery bytes 11..13), refuse payloads that would overrun the 64-byte decode
+  buffer, and only publish last-month values when the decoded payload contains them.
+
 No configuration changes: existing `version_3` YAML works as is. Remove `toolchain: platformio` and
 `platformio_options: lib_ignore: WiFi` from your config if you added them.
