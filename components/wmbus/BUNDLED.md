@@ -22,7 +22,7 @@ Changes from upstream `version_3`:
     keys are accepted; the LFSR seed is the first 4 bytes XOR the next 4, as wmbusmeters does.
   - **Second default key:** with no key, both Diehl default keys are tried (previously only the first),
     so PRIOS meters that use the second one now decode.
-  - **New sensors:** `last_month_measure_date` (number, YYYYMMDD), and for SAP PRIOS frames
+  - **New sensors:** `last_month_measure_date` (number, YYMMDD — kept under 16777216 so it survives the 32-bit float sensor state), and for SAP PRIOS frames
     `serial_number` and `manufacture_year`.
   - Drivers can now opt out of the generic AES decrypt (`Driver::decrypts_itself()`), which is what lets
     a key reach the IZAR driver.

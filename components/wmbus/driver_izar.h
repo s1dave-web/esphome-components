@@ -37,7 +37,9 @@ struct Izar: Driver
       }
     }
 
-    // Date of the last-month reading, as a number YYYYMMDD (bytes 9..10 of the decoded payload)
+    // Date of the last-month reading, as a number YYMMDD (bytes 9..10 of the decoded payload).
+    // Not YYYYMMDD: ESPHome sensor states are 32-bit floats, exact only up to 16777216, so an
+    // 8-digit date gets rounded to an even number (20261031 became 20261032).
     if (decoded_size > 10) {
       add_to_map(ret_val, "last_month_measure_date", this->get_last_month_measure_date(decrypted));
     }
@@ -75,11 +77,11 @@ private:
   }
 
   esphome::optional<double> get_last_month_measure_date(uint8_t *decrypted) {
-    uint16_t year = ((decrypted[10] & 0xF0) >> 1) + ((decrypted[9] & 0xE0) >> 5);
-    year += (year > 80) ? 1900 : 2000;
+    // Two-digit year as the meter sends it (above 80 means 19xx, otherwise 20xx)
+    const uint16_t year = ((decrypted[10] & 0xF0) >> 1) + ((decrypted[9] & 0xE0) >> 5);
     const uint8_t month = decrypted[10] & 0x0F;
     const uint8_t day = decrypted[9] & 0x1F;
-    if (month < 1 || month > 12 || day < 1 || day > 31) {
+    if (year > 99 || month < 1 || month > 12 || day < 1 || day > 31) {
       return {};
     }
     return (double)(year * 10000UL + month * 100UL + day);
